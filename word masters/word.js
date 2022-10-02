@@ -1,22 +1,35 @@
 const WORD_OF_DAY_URL = "https://words.dev-apis.com/word-of-the-day";
 const VALID_WORD_URL = "https://words.dev-apis.com/validate-word";
 const ANSWER_LENGTH=5;
+const ROUNDS = 6;
 let square = document.querySelectorAll(".square");
+let header = document.querySelector(".header");
 let loadingDiv = document.querySelector(".info-bar");
+let isLoading =true;
 let guessWord = "";
 let currentRow = 0;
 let wordOfTheDay ="";
-let wordParts ="";
-function isLetter(letter) {
-    return /^[a-zA-Z]$/.test(letter);
-  }
+let wordOfTheDayParts ="";
+let guessWordParts = "";
+let done = false;
+
+
+inputLetter();
+
+ // listening for event keys and routing to the right function
+  // we listen on keydown so we can catch Enter and Backspace
 async function inputLetter(){
     const res = await fetch(WORD_OF_DAY_URL);
     const resObj = await res.json();
     wordOfTheDay= resObj.word.toUpperCase();
-    wordParts = wordOfTheDay.split("");
-    setLoading(false);
+    wordOfTheDayParts = wordOfTheDay.split("");
+    isLoading=false;
+    setLoading(isLoading);
     document.addEventListener('keydown', function handleKeyPress(event) {
+        if (done || isLoading) {
+            // do nothing;
+            return;
+          }
        const action = event.key;
        if (action === "Enter") {
            enter();
@@ -29,10 +42,13 @@ async function inputLetter(){
        }
     });
 }
+function backspace(){
+    guessWord = guessWord.substring(0,guessWord.length-1);
+    square[ANSWER_LENGTH * currentRow + guessWord.length].innerText = "";
+}
 
 function addLetter(letter){
-    if(guessWord.length<5)
-    {
+    if(guessWord.length<ANSWER_LENGTH){
         guessWord+=letter;
     }
     else{
@@ -40,23 +56,22 @@ function addLetter(letter){
     }
     square[ANSWER_LENGTH *currentRow+ guessWord.length-1].innerText = letter;
 }
-function backspace(){
-    guessWord = guessWord.substring(0,guessWord.length-1);
-    square[ANSWER_LENGTH * currentRow + guessWord.length].innerText = "";
-}
+
 async function enter(){
     if(guessWord.length===ANSWER_LENGTH){
-        setLoading(true);
+        isLoading=true;
+        setLoading(isLoading);
         const res = await fetch(VALID_WORD_URL, {
             method: "POST",
             body: JSON.stringify({word: guessWord})
         });
         const resObj = await res.json();
-        setLoading(false);
         let valid = resObj.validWord;
         //let {validWord} =resObj;
+        isLoading=false;
+        setLoading(isLoading);
         if(valid){
-            if(guessWord ===wordOfTheDay){
+            if(guessWord === wordOfTheDay){
                 win();
             }
             else{
@@ -70,15 +85,65 @@ async function enter(){
 }
 
 function markCorrectLetters(){
+    guessWordParts = guessWord.split("");
+    const map = makeMap(wordOfTheDayParts);
+    for(let i=0; i<ANSWER_LENGTH; i++){
+        if(guessWordParts[i] ===  wordOfTheDayParts[i]){
+            square[ANSWER_LENGTH * currentRow +i].classList.add("correct");
+            map[guessWordParts[i]]--;
+        }
+        else if(wordOfTheDayParts.includes(guessWordParts[i]) && map[guessWordParts[i]] > 0){
+            square[ANSWER_LENGTH * currentRow +i].classList.add("close");
+            map[guessWordParts[i]]--;
+        }
+        else{
+            square[ANSWER_LENGTH * currentRow +i].classList.add("worng");
+        }
+    }
     guessWord = "";
-    alert("wrong word");
 }
 function markRed(){
-    alert("invalid word");
+    for(let i=0; i<ANSWER_LENGTH; i++){
+        square[ANSWER_LENGTH * currentRow +i].classList.remove("invalid");
+        setTimeout(
+            () => square[currentRow * ANSWER_LENGTH + i].classList.add("invalid"),
+            10
+          );
+    }
 }
 function win(){
-    alert("you win");
+    for(let i=0; i<ANSWER_LENGTH; i++){
+        square[ANSWER_LENGTH * currentRow +i].classList.add("correct");
+    }
+    header.classList.add("win");
+    done = true;
+    if (currentRow === ROUNDS) {
+        // lose
+        done = true;
+      }
 }
+
+function isLetter(letter) {
+    return /^[a-zA-Z]$/.test(letter);
+  }
+
+function setLoading(isLoading) {
+    loadingDiv.classList.toggle("hidden", !isLoading);
+ }
+
+ function makeMap(array) {
+    const obj = {};
+    for (let i = 0; i < array.length; i++) {
+      if (obj[array[i]]) {
+        obj[array[i]]++;
+      } else {
+        obj[array[i]] = 1;
+      }
+    }
+    return obj;
+  }
+  
+ 
 /**async function getDailyWord(){
     const res = await fetch(WORD_OF_DAY_URL);
     const resObj = await res.json();
@@ -86,10 +151,6 @@ function win(){
     wordParts = wordOfTheDay.split("");
     setLoading(false);
 }**/
-
-function setLoading(isLoading) {
-    loadingDiv.classList.toggle("hidden", !isLoading);
- }
 
 /** async function isValidWord(word){
     const res = await fetch(VALID_WORD_URL, {
@@ -100,4 +161,3 @@ function setLoading(isLoading) {
     valid = resObj.validWord;
 }**/
 
-inputLetter();
